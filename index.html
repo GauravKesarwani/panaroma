@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+  <head>
+    <title>Panorama</title>
+  </head>
+
+  <style>
+    body {
+      margin: 0;
+    }
+    #panorama {
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+/*    #panorama,
+    #panorama-inner {
+      height: 1920px;
+    }*/
+
+    #panorama-inner {
+      background-image: url('./images/gyroscope_image.jpg');
+      background-repeat: no-repeat;
+    }
+  </style>
+  <body>
+    <div id="panorama">
+      <div id="panorama-inner">
+        <img class="panorama-img" src="./images/gyroscope_image.jpg" />
+      </div>
+    </div>
+
+    <script>
+      'use strict';
+      function touchHandler(event) {
+        const touches = event.changedTouches;
+        const touch = touches[0];
+        let type = "";
+
+        switch(event.type) {
+          case "touchstart": type="mousedown"; break;
+          case "touchmove":  type="mousemove"; break;
+          case "touchend":   type="mouseup"; break;
+          default: return;
+        }
+
+        const mult = 2;       //  Not sure why this is set to 2.
+
+        const simulatedEvent = new MouseEvent(type, {
+          screenX: touch.screenX,
+          screenY: touch.screenY,
+          clientX: (touch.clientX * mult),
+          clientY: (touch.clientY * mult)
+        });
+
+        document.dispatchEvent(simulatedEvent);
+      }
+
+      document.addEventListener("touchstart", touchHandler, true);
+      document.addEventListener("touchmove", touchHandler, true);
+      document.addEventListener("touchend", touchHandler, true);
+      document.addEventListener("touchcancel", touchHandler, true);
+
+      const img = document.querySelector('.panorama-img');
+
+      function onImageLoad() {
+        const imgSrc = img.getAttribute("src")
+
+        const imgWidth = img.clientWidth;
+        const imgHeight = img.clientHeight;
+
+        const panorama = document.getElementById('panorama');
+        const panoramaInner = document.getElementById('panorama-inner');
+        panoramaInner.style.backgroundImage = `url(${imgSrc})`;
+        panoramaInner.style.backgroundSize = 'cover';
+        panoramaInner.style.width = `${imgWidth}px`;         // set the inner container width to the width of the image
+        panoramaInner.style.height = `${Math.max(document.documentElement.clientHeight, window.innerHeight || 0)}px`;
+        panoramaInner.style.backgroundPosition = '0px 0px';
+
+        function handleTransitionEnd() {
+          panoramaInner.style.transition = 'all 200ms linear';
+        }
+
+        panoramaInner.addEventListener('transitionend', handleTransitionEnd);
+
+        const containerBounds = {
+          width: panorama.clientWidth,
+          height: panorama.clientHeight
+        };
+
+        const bounds = {
+          w: imgWidth - containerBounds.width,
+          h: imgHeight - containerBounds.height
+        };
+
+        const operation = { startX: 0 };      // touch operation start position
+        const bgposition = { x: 0 };        // background image position from left
+        let ismouseMoveActive = false;
+
+        function handleMouseMove (event) {
+          let inbounds = false;
+          let offset = bgposition.x - (operation.startX - event.clientX);    // next mousemove event x - previous mouse position
+
+          inbounds = offset < 0 && (offset * -1) < bounds.w;
+          /* Assuming scroll direction is always horizontal and background image is repeat. */
+
+          if (ismouseMoveActive && inbounds) {
+            bgposition.x = offset;
+          }
+
+          panoramaInner.style.backgroundPosition = `${bgposition.x}px 0px`;
+          operation.startX = event.clientX;
+          event.stopPropagation();
+        }
+
+        function handleMouseUp() {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          ismouseMoveActive = false;
+        }
+
+        function handleMouseDown(event) {
+          panoramaInner.style.transition = 'all 700ms ease-out';
+          operation.startX = event.clientX;
+          ismouseMoveActive = true;
+          document.addEventListener('mousemove', handleMouseMove);
+          document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        const orientation = { x: 0 };
+        const bgOrientationposition = { x: bgposition.x };
+
+        function handleOrientation(event) {
+           let offsetWidth = parseFloat((((orientation.x - event.gamma)/90) * imgWidth));
+
+          if (((bgOrientationposition.x + offsetWidth) > 0) ||
+            (Math.abs(bgOrientationposition.x + offsetWidth) + containerBounds.width > imgWidth)) {
+            return;
+          }
+
+          bgOrientationposition.x += offsetWidth;
+          orientation.x = event.gamma;
+          panoramaInner.style.backgroundPosition = `${bgOrientationposition.x}px 0px`;
+        }
+
+        //window.addEventListener('deviceorientation', handleOrientation);
+        document.addEventListener('mousedown', handleMouseDown);
+
+        img.style.display = 'none';
+      }
+
+      img.addEventListener('load', onImageLoad);
+    </script>
+  </body>
+</html>
